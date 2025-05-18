@@ -5,7 +5,7 @@ This document outlines the key design decisions, assumptions, and trade-offs mad
 ## 1. Pattern Identification Method
 
 ### Approach
-We implemented a multi-faceted approach to pattern identification that combines three complementary techniques:
+I implemented a multi-faceted approach to pattern identification that combines three complementary techniques:
 
 1. **Topic Modeling with LDA**
    - Identifies abstract themes across documents
@@ -34,7 +34,7 @@ This multi-faceted approach was chosen because:
 ## 2. Chunking Strategy
 
 ### Approach
-Our chunking strategy uses a hybrid approach that balances semantic coherence with practical constraints:
+I implemented a hybrid chunking strategy that balances semantic coherence with practical constraints:
 
 1. **Pattern-Based Boundaries**
    - Uses identified clusters as natural boundaries for chunks

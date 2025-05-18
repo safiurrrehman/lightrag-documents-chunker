@@ -1,0 +1,10 @@
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+spacy>=3.7.2
+nltk>=3.8.1
+sentence-transformers>=2.5.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+tqdm>=4.66.0
+flask>=2.0.0

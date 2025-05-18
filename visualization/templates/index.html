@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}RAG Visualization Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>RAG System Visualization Dashboard</h4>
+            </div>
+            <div class="card-body">
+                <p class="lead">
+                    Welcome to the Pattern-Aware RAG System Visualization Dashboard. This interface allows you to explore and visualize the chunks and patterns identified by the RAG system.
+                </p>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-cubes me-2"></i>Chunk Visualization</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Visualize how documents are chunked and how chunks relate to each other. See the distribution of chunk sizes and their semantic relationships.</p>
+                                <a href="/chunk-visualization" class="btn btn-info mt-3">
+                                    <i class="fas fa-chart-bar me-1"></i> Explore Chunks
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Pattern Explorer</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Explore patterns identified across documents, including topics, semantic clusters, and key entities. Understand how patterns influence chunking.</p>
+                                <a href="/pattern-explorer" class="btn btn-success mt-3">
+                                    <i class="fas fa-project-diagram me-1"></i> Explore Patterns
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0"><i class="fas fa-cogs me-2"></i>Process Documents</h4>
+            </div>
+            <div class="card-body">
+                <form id="process-documents-form">
+                    <div class="mb-3">
+                        <label for="documents-directory" class="form-label">Documents Directory</label>
+                        <input type="text" class="form-control" id="documents-directory" placeholder="/path/to/documents" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="max-chunk-size" class="form-label">Max Chunk Size</label>
+                                <input type="number" class="form-control" id="max-chunk-size" value="1000" min="100" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="min-chunk-size" class="form-label">Min Chunk Size</label>
+                                <input type="number" class="form-control" id="min-chunk-size" value="100" min="10" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="overlap-size" class="form-label">Overlap Size</label>
+                                <input type="number" class="form-control" id="overlap-size" value="50" min="0" required>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play me-1"></i> Process Documents
+                    </button>
+                </form>
+                <div id="processing-status" class="mt-3 d-none">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            <div>Processing documents... This may take a few minutes.</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="processing-result" class="mt-3 d-none">
+                    <div class="alert alert-success">
+                        <div id="result-message"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Overview</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div id="documents-chart" style="height: 300px;"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div id="patterns-chart" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Process documents form submission
+    const processForm = document.getElementById('process-documents-form');
+    const processingStatus = document.getElementById('processing-status');
+    const processingResult = document.getElementById('processing-result');
+    const resultMessage = document.getElementById('result-message');
+    
+    processForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const documentsDirectory = document.getElementById('documents-directory').value;
+        const maxChunkSize = document.getElementById('max-chunk-size').value;
+        const minChunkSize = document.getElementById('min-chunk-size').value;
+        const overlapSize = document.getElementById('overlap-size').value;
+        
+        // Show processing status
+        processingStatus.classList.remove('d-none');
+        processingResult.classList.add('d-none');
+        
+        // Send request to process documents
+        fetch('/api/process-documents', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                documents_directory: documentsDirectory,
+                max_chunk_size: maxChunkSize,
+                min_chunk_size: minChunkSize,
+                overlap_size: overlapSize
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide processing status
+            processingStatus.classList.add('d-none');
+            
+            if (data.error) {
+                // Show error
+                processingResult.classList.remove('d-none');
+                processingResult.querySelector('.alert').classList.remove('alert-success');
+                processingResult.querySelector('.alert').classList.add('alert-danger');
+                resultMessage.textContent = `Error: ${data.error}`;
+            } else {
+                // Show success
+                processingResult.classList.remove('d-none');
+                processingResult.querySelector('.alert').classList.remove('alert-danger');
+                processingResult.querySelector('.alert').classList.add('alert-success');
+                resultMessage.innerHTML = `
+                    <strong>Success!</strong> Processed ${data.documents_processed} documents and created ${data.chunks_created} chunks.
+                    <br>
+                    <a href="/chunk-visualization" class="btn btn-sm btn-info mt-2">
+                        <i class="fas fa-chart-bar me-1"></i> View Chunk Visualization
+                    </a>
+                    <a href="/pattern-explorer" class="btn btn-sm btn-success mt-2 ms-2">
+                        <i class="fas fa-project-diagram me-1"></i> Explore Patterns
+                    </a>
+                `;
+                
+                // Refresh charts
+                fetchVisualizationData();
+            }
+        })
+        .catch(error => {
+            // Hide processing status
+            processingStatus.classList.add('d-none');
+            
+            // Show error
+            processingResult.classList.remove('d-none');
+            processingResult.querySelector('.alert').classList.remove('alert-success');
+            processingResult.querySelector('.alert').classList.add('alert-danger');
+            resultMessage.textContent = `Error: ${error.message}`;
+        });
+    });
+    
+    // Fetch visualization data and update charts
+    function fetchVisualizationData() {
+        fetch('/api/get-visualization-data')
+            .then(response => response.json())
+            .then(data => {
+                updateDocumentsChart(data);
+                updatePatternsChart(data);
+            })
+            .catch(error => {
+                console.error('Error fetching visualization data:', error);
+            });
+    }
+    
+    // Update documents chart
+    function updateDocumentsChart(data) {
+        const documents = data.documents;
+        const chunks = data.chunks;
+        
+        // Group chunks by document
+        const chunksByDocument = {};
+        chunks.forEach(chunk => {
+            if (!chunksByDocument[chunk.document_id]) {
+                chunksByDocument[chunk.document_id] = [];
+            }
+            chunksByDocument[chunk.document_id].push(chunk);
+        });
+        
+        // Prepare data for chart
+        const documentIds = documents.map(doc => doc.document_id);
+        const documentLengths = documents.map(doc => doc.content_length);
+        const chunkCounts = documents.map(doc => 
+            chunksByDocument[doc.document_id] ? chunksByDocument[doc.document_id].length : 0
+        );
+        
+        // Create chart
+        const trace1 = {
+            x: documentIds,
+            y: documentLengths,
+            name: 'Document Length (chars)',
+            type: 'bar'
+        };
+        
+        const trace2 = {
+            x: documentIds,
+            y: chunkCounts,
+            name: 'Number of Chunks',
+            type: 'bar'
+        };
+        
+        const layout = {
+            title: 'Documents and Chunks',
+            barmode: 'group',
+            xaxis: {
+                title: 'Document ID'
+            },
+            yaxis: {
+                title: 'Count'
+            }
+        };
+        
+        Plotly.newPlot('documents-chart', [trace1, trace2], layout);
+    }
+    
+    // Update patterns chart
+    function updatePatternsChart(data) {
+        const topics = data.topics.length;
+        const clusters = data.clusters.length;
+        const entities = data.entities.length;
+        
+        // Create chart
+        const trace = {
+            labels: ['Topics', 'Clusters', 'Entities'],
+            values: [topics, clusters, entities],
+            type: 'pie',
+            marker: {
+                colors: ['#e74c3c', '#f39c12', '#3498db']
+            }
+        };
+        
+        const layout = {
+            title: 'Pattern Distribution'
+        };
+        
+        Plotly.newPlot('patterns-chart', [trace], layout);
+    }
+    
+    // Initial data fetch
+    fetchVisualizationData();
+});
+</script>
+{% endblock %}

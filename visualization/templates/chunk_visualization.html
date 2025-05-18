@@ -1,0 +1,489 @@
+{% extends "base.html" %}
+
+{% block title %}Chunk Visualization{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chunk-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+    .chunk-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .chunk-content {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    .pattern-badge {
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    .topic-badge {
+        background-color: #e74c3c;
+    }
+    .cluster-badge {
+        background-color: #f39c12;
+    }
+    .entity-badge {
+        background-color: #3498db;
+    }
+    #chunk-distribution-chart {
+        width: 100%;
+        height: 400px;
+    }
+    #chunk-network-container {
+        width: 100%;
+        height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    .modal-xl {
+        max-width: 90%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0"><i class="fas fa-cubes me-2"></i>Chunk Visualization</h4>
+            </div>
+            <div class="card-body">
+                <p class="lead">
+                    This visualization shows how documents are chunked and how chunks relate to patterns.
+                    Explore the distribution of chunk sizes, their content, and their relationships to topics, clusters, and entities.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Chunk Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div id="chunk-distribution-chart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Chunk Network</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <button id="generate-network-btn" class="btn btn-primary">
+                        <i class="fas fa-sync me-1"></i> Generate Network Graph
+                    </button>
+                </div>
+                <div id="chunk-network-container">
+                    <div class="d-flex justify-content-center align-items-center h-100">
+                        <p class="text-muted">Click the button above to generate the network graph.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Chunk Explorer</h5>
+                <div>
+                    <div class="input-group">
+                        <input type="text" id="chunk-search" class="form-control" placeholder="Search chunks...">
+                        <button class="btn btn-outline-light" type="button" id="chunk-search-btn">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row" id="chunks-container">
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Loading chunks...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chunk Detail Modal -->
+<div class="modal fade" id="chunk-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-cube me-2"></i>Chunk Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Content</h6>
+                            </div>
+                            <div class="card-body">
+                                <pre id="modal-chunk-content" class="p-3 bg-light" style="max-height: 400px; overflow-y: auto;"></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Metadata</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <th>Chunk ID</th>
+                                            <td id="modal-chunk-id"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Document</th>
+                                            <td id="modal-document-id"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Position</th>
+                                            <td id="modal-chunk-position"></td>
+                                        </tr>
+                                        <tr>
+                                            <th>Size</th>
+                                            <td id="modal-chunk-size"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Topics</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-chunk-topics"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Clusters</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-chunk-clusters"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Entities</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-chunk-entities"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let visualizationData = null;
+    
+    // Fetch visualization data
+    function fetchVisualizationData() {
+        fetch('/api/get-visualization-data')
+            .then(response => response.json())
+            .then(data => {
+                visualizationData = data;
+                updateChunkDistributionChart(data);
+                renderChunks(data);
+            })
+            .catch(error => {
+                console.error('Error fetching visualization data:', error);
+            });
+    }
+    
+    // Update chunk distribution chart
+    function updateChunkDistributionChart(data) {
+        const chunks = data.chunks;
+        
+        // Calculate chunk sizes
+        const chunkSizes = chunks.map(chunk => chunk.end_position - chunk.start_position);
+        
+        // Create histogram data
+        const trace = {
+            x: chunkSizes,
+            type: 'histogram',
+            marker: {
+                color: '#3498db'
+            }
+        };
+        
+        const layout = {
+            title: 'Chunk Size Distribution',
+            xaxis: {
+                title: 'Chunk Size (characters)'
+            },
+            yaxis: {
+                title: 'Frequency'
+            }
+        };
+        
+        Plotly.newPlot('chunk-distribution-chart', [trace], layout);
+    }
+    
+    // Render chunks
+    function renderChunks(data) {
+        const chunksContainer = document.getElementById('chunks-container');
+        const chunks = data.chunks;
+        
+        // Clear container
+        chunksContainer.innerHTML = '';
+        
+        if (chunks.length === 0) {
+            chunksContainer.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <p class="text-muted">No chunks available.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Get topic and cluster data for reference
+        const topicsMap = {};
+        data.topics.forEach(topic => {
+            topicsMap[topic.topic_id] = topic;
+        });
+        
+        const clustersMap = {};
+        data.clusters.forEach(cluster => {
+            clustersMap[cluster.cluster_id] = cluster;
+        });
+        
+        // Render each chunk
+        chunks.forEach(chunk => {
+            const chunkSize = chunk.end_position - chunk.start_position;
+            
+            // Create topic badges
+            const topicBadges = (chunk.topics || []).map(topicId => {
+                const topic = topicsMap[topicId];
+                const keywords = topic ? topic.keywords.slice(0, 3).join(', ') : '';
+                return `<span class="badge topic-badge" title="Keywords: ${keywords}">Topic ${topicId}</span>`;
+            }).join(' ');
+            
+            // Create cluster badges
+            const clusterBadges = (chunk.clusters || []).map(clusterId => {
+                return `<span class="badge cluster-badge">Cluster ${clusterId}</span>`;
+            }).join(' ');
+            
+            // Create entity badges
+            const entityBadges = (chunk.entities || []).map(entity => {
+                return `<span class="badge entity-badge">${entity}</span>`;
+            }).join(' ');
+            
+            const chunkCard = document.createElement('div');
+            chunkCard.className = 'col-md-6 col-lg-4 mb-4';
+            chunkCard.innerHTML = `
+                <div class="card h-100 chunk-card" data-chunk-id="${chunk.chunk_id}">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Chunk ${chunk.chunk_id} (${chunkSize} chars)</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Document: ${chunk.document_id}</p>
+                        <div class="chunk-content mb-3">
+                            <pre class="p-2 bg-light">${chunk.content_preview}</pre>
+                        </div>
+                        <div class="mb-2">
+                            ${topicBadges}
+                            ${clusterBadges}
+                            ${entityBadges}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <button class="btn btn-sm btn-primary view-chunk-btn" data-chunk-id="${chunk.chunk_id}">
+                            <i class="fas fa-search me-1"></i> View Details
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            chunksContainer.appendChild(chunkCard);
+        });
+        
+        // Add event listeners to chunk cards
+        document.querySelectorAll('.view-chunk-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const chunkId = parseInt(this.getAttribute('data-chunk-id'));
+                showChunkDetails(chunkId);
+            });
+        });
+    }
+    
+    // Show chunk details in modal
+    function showChunkDetails(chunkId) {
+        const chunk = visualizationData.chunks.find(c => c.chunk_id === chunkId);
+        if (!chunk) return;
+        
+        // Set modal content
+        document.getElementById('modal-chunk-id').textContent = chunk.chunk_id;
+        document.getElementById('modal-document-id').textContent = chunk.document_id;
+        document.getElementById('modal-chunk-position').textContent = `${chunk.start_position} - ${chunk.end_position}`;
+        document.getElementById('modal-chunk-size').textContent = `${chunk.end_position - chunk.start_position} characters`;
+        document.getElementById('modal-chunk-content').textContent = chunk.content_preview;
+        
+        // Set topics
+        const topicsContainer = document.getElementById('modal-chunk-topics');
+        topicsContainer.innerHTML = '';
+        if (chunk.topics && chunk.topics.length > 0) {
+            chunk.topics.forEach(topicId => {
+                const topic = visualizationData.topics.find(t => t.topic_id === topicId);
+                if (topic) {
+                    const topicElement = document.createElement('div');
+                    topicElement.className = 'mb-2';
+                    topicElement.innerHTML = `
+                        <span class="badge topic-badge">Topic ${topicId}</span>
+                        <p class="small mt-1">${topic.keywords.slice(0, 5).join(', ')}</p>
+                    `;
+                    topicsContainer.appendChild(topicElement);
+                }
+            });
+        } else {
+            topicsContainer.innerHTML = '<p class="text-muted small">No topics associated with this chunk.</p>';
+        }
+        
+        // Set clusters
+        const clustersContainer = document.getElementById('modal-chunk-clusters');
+        clustersContainer.innerHTML = '';
+        if (chunk.clusters && chunk.clusters.length > 0) {
+            chunk.clusters.forEach(clusterId => {
+                const cluster = visualizationData.clusters.find(c => c.cluster_id === clusterId);
+                if (cluster) {
+                    const clusterElement = document.createElement('div');
+                    clusterElement.className = 'mb-2';
+                    clusterElement.innerHTML = `
+                        <span class="badge cluster-badge">Cluster ${clusterId}</span>
+                        <p class="small mt-1">${cluster.sample_sentences[0]}</p>
+                    `;
+                    clustersContainer.appendChild(clusterElement);
+                }
+            });
+        } else {
+            clustersContainer.innerHTML = '<p class="text-muted small">No clusters associated with this chunk.</p>';
+        }
+        
+        // Set entities
+        const entitiesContainer = document.getElementById('modal-chunk-entities');
+        entitiesContainer.innerHTML = '';
+        if (chunk.entities && chunk.entities.length > 0) {
+            chunk.entities.forEach(entity => {
+                const entityElement = document.createElement('span');
+                entityElement.className = 'badge entity-badge me-1 mb-1';
+                entityElement.textContent = entity;
+                entitiesContainer.appendChild(entityElement);
+            });
+        } else {
+            entitiesContainer.innerHTML = '<p class="text-muted small">No entities associated with this chunk.</p>';
+        }
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('chunk-detail-modal'));
+        modal.show();
+    }
+    
+    // Generate network graph
+    document.getElementById('generate-network-btn').addEventListener('click', function() {
+        const networkContainer = document.getElementById('chunk-network-container');
+        networkContainer.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center h-100">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="ms-3">Generating network graph...</p>
+            </div>
+        `;
+        
+        fetch('/api/generate-network-graph')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    networkContainer.innerHTML = `
+                        <div class="alert alert-danger m-3">
+                            Error generating network graph: ${data.error}
+                        </div>
+                    `;
+                } else {
+                    networkContainer.innerHTML = `
+                        <iframe src="${data.graph_path}" width="100%" height="100%" frameborder="0"></iframe>
+                    `;
+                }
+            })
+            .catch(error => {
+                networkContainer.innerHTML = `
+                    <div class="alert alert-danger m-3">
+                        Error generating network graph: ${error.message}
+                    </div>
+                `;
+            });
+    });
+    
+    // Search functionality
+    document.getElementById('chunk-search-btn').addEventListener('click', function() {
+        searchChunks();
+    });
+    
+    document.getElementById('chunk-search').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchChunks();
+        }
+    });
+    
+    function searchChunks() {
+        const searchTerm = document.getElementById('chunk-search').value.toLowerCase();
+        
+        if (!visualizationData) return;
+        
+        const filteredChunks = visualizationData.chunks.filter(chunk => {
+            return (
+                chunk.content_preview.toLowerCase().includes(searchTerm) ||
+                chunk.document_id.toLowerCase().includes(searchTerm) ||
+                chunk.chunk_id.toString().includes(searchTerm)
+            );
+        });
+        
+        const modifiedData = {
+            ...visualizationData,
+            chunks: filteredChunks
+        };
+        
+        renderChunks(modifiedData);
+    }
+    
+    // Initial data fetch
+    fetchVisualizationData();
+});
+</script>
+{% endblock %}

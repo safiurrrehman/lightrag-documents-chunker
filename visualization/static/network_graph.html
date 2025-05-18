@@ -1,0 +1,155 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 750px;
+                 background-color: #222222;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#3498db", "font": {"color": "white"}, "id": "doc_doc1", "label": "Document: doc1", "shape": "dot", "size": 20, "title": "Document: doc1\nLength: 5000 chars"}, {"color": "#3498db", "font": {"color": "white"}, "id": "doc_doc2", "label": "Document: doc2", "shape": "dot", "size": 20, "title": "Document: doc2\nLength: 3500 chars"}, {"color": "#3498db", "font": {"color": "white"}, "id": "doc_doc3", "label": "Document: doc3", "shape": "dot", "size": 20, "title": "Document: doc3\nLength: 4200 chars"}, {"color": "#2ecc71", "font": {"color": "white"}, "id": "chunk_0", "label": "Chunk 0", "shape": "dot", "size": 15, "title": "Chunk 0\nDocument: doc1\nPreview: This is the beginning of document 1..."}, {"color": "#2ecc71", "font": {"color": "white"}, "id": "chunk_1", "label": "Chunk 1", "shape": "dot", "size": 15, "title": "Chunk 1\nDocument: doc1\nPreview: Continuing with document 1..."}, {"color": "#2ecc71", "font": {"color": "white"}, "id": "chunk_2", "label": "Chunk 2", "shape": "dot", "size": 15, "title": "Chunk 2\nDocument: doc2\nPreview: This is the beginning of document 2..."}, {"color": "#2ecc71", "font": {"color": "white"}, "id": "chunk_3", "label": "Chunk 3", "shape": "dot", "size": 15, "title": "Chunk 3\nDocument: doc3\nPreview: This is the beginning of document 3..."}, {"color": "#e74c3c", "font": {"color": "white"}, "id": "topic_0", "label": "Topic 0", "shape": "triangle", "size": 25, "title": "Topic 0\nKeywords: machine, learning, algorithm, data, model\nWeight: 0.35"}, {"color": "#e74c3c", "font": {"color": "white"}, "id": "topic_1", "label": "Topic 1", "shape": "triangle", "size": 25, "title": "Topic 1\nKeywords: neural, network, deep, training, layer\nWeight: 0.25"}, {"color": "#e74c3c", "font": {"color": "white"}, "id": "topic_2", "label": "Topic 2", "shape": "triangle", "size": 25, "title": "Topic 2\nKeywords: retrieval, augmented, generation, rag, chunks\nWeight: 0.4"}, {"color": "#f39c12", "font": {"color": "white"}, "id": "cluster_0", "label": "Cluster 0", "shape": "diamond", "size": 20, "title": "Cluster 0\nSentences: 12\nSample: This is a sample sentence about machine learning."}, {"color": "#f39c12", "font": {"color": "white"}, "id": "cluster_1", "label": "Cluster 1", "shape": "diamond", "size": 20, "title": "Cluster 1\nSentences: 8\nSample: Neural networks have multiple layers."}, {"color": "#f39c12", "font": {"color": "white"}, "id": "cluster_2", "label": "Cluster 2", "shape": "diamond", "size": 20, "title": "Cluster 2\nSentences: 15\nSample: RAG systems combine retrieval and generation."}]);
+                  edges = new vis.DataSet([{"color": "#3498db", "from": "doc_doc1", "to": "chunk_0", "width": 2}, {"color": "#3498db", "from": "doc_doc1", "to": "chunk_1", "width": 2}, {"color": "#3498db", "from": "doc_doc2", "to": "chunk_2", "width": 2}, {"color": "#3498db", "from": "doc_doc3", "to": "chunk_3", "width": 2}, {"color": "#e74c3c", "from": "chunk_0", "to": "topic_0", "width": 1}, {"color": "#f39c12", "from": "chunk_0", "to": "cluster_0", "width": 1}, {"color": "#e74c3c", "from": "chunk_1", "to": "topic_0", "width": 1}, {"color": "#e74c3c", "from": "chunk_1", "to": "topic_1", "width": 1}, {"color": "#f39c12", "from": "chunk_1", "to": "cluster_0", "width": 1}, {"color": "#f39c12", "from": "chunk_1", "to": "cluster_1", "width": 1}, {"color": "#e74c3c", "from": "chunk_2", "to": "topic_1", "width": 1}, {"color": "#f39c12", "from": "chunk_2", "to": "cluster_1", "width": 1}, {"color": "#e74c3c", "from": "chunk_3", "to": "topic_2", "width": 1}, {"color": "#f39c12", "from": "chunk_3", "to": "cluster_2", "width": 1}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

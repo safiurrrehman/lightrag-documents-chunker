@@ -1,0 +1,765 @@
+{% extends "base.html" %}
+
+{% block title %}Pattern Explorer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pattern-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+    .pattern-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .topic-card {
+        border-left: 5px solid #e74c3c;
+    }
+    .cluster-card {
+        border-left: 5px solid #f39c12;
+    }
+    .entity-card {
+        border-left: 5px solid #3498db;
+    }
+    .pattern-badge {
+        margin-right: 5px;
+        margin-bottom: 5px;
+    }
+    .topic-badge {
+        background-color: #e74c3c;
+    }
+    .cluster-badge {
+        background-color: #f39c12;
+    }
+    .entity-badge {
+        background-color: #3498db;
+    }
+    #pattern-distribution-chart {
+        width: 100%;
+        height: 400px;
+    }
+    #topic-heatmap-chart {
+        width: 100%;
+        height: 500px;
+    }
+    .modal-xl {
+        max-width: 90%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="fas fa-network-wired me-2"></i>Pattern Explorer</h4>
+            </div>
+            <div class="card-body">
+                <p class="lead">
+                    This visualization allows you to explore patterns identified across documents,
+                    including topics, semantic clusters, and key entities. Understand how these patterns
+                    influence the chunking process and relate to document content.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Pattern Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div id="pattern-distribution-chart"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-th me-2"></i>Topic Keyword Heatmap</h5>
+            </div>
+            <div class="card-body">
+                <div id="topic-heatmap-chart"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Patterns</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show-topics" checked>
+                            <label class="form-check-label" for="show-topics">
+                                <span class="badge topic-badge">Topics</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show-clusters" checked>
+                            <label class="form-check-label" for="show-clusters">
+                                <span class="badge cluster-badge">Clusters</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show-entities" checked>
+                            <label class="form-check-label" for="show-entities">
+                                <span class="badge entity-badge">Entities</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" id="pattern-search" class="form-control" placeholder="Search patterns...">
+                            <button class="btn btn-outline-secondary" type="button" id="pattern-search-btn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select" id="sort-patterns">
+                            <option value="default">Default Order</option>
+                            <option value="weight-desc">Weight (High to Low)</option>
+                            <option value="weight-asc">Weight (Low to High)</option>
+                            <option value="chunks-desc">Associated Chunks (Most to Least)</option>
+                            <option value="chunks-asc">Associated Chunks (Least to Most)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Pattern List</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="patterns-container">
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Loading patterns...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pattern Detail Modal -->
+<div class="modal fade" id="pattern-detail-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-network-wired me-2"></i>Pattern Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0" id="modal-pattern-title">Pattern Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-pattern-content"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Pattern Statistics</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-pattern-stats"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">Associated Chunks</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="modal-associated-chunks" style="max-height: 500px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let visualizationData = null;
+    
+    // Fetch visualization data
+    function fetchVisualizationData() {
+        fetch('/api/get-visualization-data')
+            .then(response => response.json())
+            .then(data => {
+                visualizationData = data;
+                updatePatternDistributionChart(data);
+                updateTopicHeatmapChart(data);
+                renderPatterns(data);
+            })
+            .catch(error => {
+                console.error('Error fetching visualization data:', error);
+            });
+    }
+    
+    // Update pattern distribution chart
+    function updatePatternDistributionChart(data) {
+        const topicCount = data.topics.length;
+        const clusterCount = data.clusters.length;
+        const entityCount = data.entities.length;
+        
+        // Count unique entities by type
+        const entityTypes = {};
+        data.entities.forEach(entity => {
+            if (!entityTypes[entity.entity_type]) {
+                entityTypes[entity.entity_type] = 0;
+            }
+            entityTypes[entity.entity_type]++;
+        });
+        
+        // Prepare data for chart
+        const labels = ['Topics', 'Clusters'];
+        const values = [topicCount, clusterCount];
+        const colors = ['#e74c3c', '#f39c12'];
+        
+        // Add entity types
+        Object.keys(entityTypes).forEach(entityType => {
+            labels.push(`Entities (${entityType})`);
+            values.push(entityTypes[entityType]);
+            colors.push('#3498db');
+        });
+        
+        // Create chart
+        const trace = {
+            labels: labels,
+            values: values,
+            type: 'pie',
+            marker: {
+                colors: colors
+            },
+            textinfo: 'label+value',
+            hoverinfo: 'label+percent',
+            textposition: 'inside'
+        };
+        
+        const layout = {
+            title: 'Pattern Type Distribution',
+            height: 400,
+            margin: {
+                l: 50,
+                r: 50,
+                b: 50,
+                t: 50,
+                pad: 4
+            }
+        };
+        
+        Plotly.newPlot('pattern-distribution-chart', [trace], layout);
+    }
+    
+    // Update topic heatmap chart
+    function updateTopicHeatmapChart(data) {
+        if (!data.topics || data.topics.length === 0) {
+            document.getElementById('topic-heatmap-chart').innerHTML = `
+                <div class="alert alert-info">
+                    No topic data available for heatmap visualization.
+                </div>
+            `;
+            return;
+        }
+        
+        // Get all unique keywords across topics
+        const allKeywords = new Set();
+        data.topics.forEach(topic => {
+            topic.keywords.slice(0, 10).forEach(keyword => {
+                allKeywords.add(keyword);
+            });
+        });
+        
+        const keywords = Array.from(allKeywords);
+        const topicIds = data.topics.map(topic => `Topic ${topic.topic_id}`);
+        
+        // Create heatmap data
+        const heatmapData = [];
+        for (let i = 0; i < keywords.length; i++) {
+            const row = [];
+            for (let j = 0; j < topicIds.length; j++) {
+                const topic = data.topics[j];
+                const keywordIndex = topic.keywords.indexOf(keywords[i]);
+                // Value is inverse of index position (higher for more important keywords)
+                // or 0 if keyword not in topic
+                const value = keywordIndex >= 0 ? (10 - keywordIndex) / 10 : 0;
+                row.push(value);
+            }
+            heatmapData.push(row);
+        }
+        
+        // Create chart
+        const trace = {
+            z: heatmapData,
+            x: topicIds,
+            y: keywords,
+            type: 'heatmap',
+            colorscale: 'Viridis',
+            showscale: true,
+            hoverongaps: false
+        };
+        
+        const layout = {
+            title: 'Topic-Keyword Heatmap',
+            xaxis: {
+                title: 'Topics'
+            },
+            yaxis: {
+                title: 'Keywords'
+            },
+            margin: {
+                l: 150,
+                r: 50,
+                b: 50,
+                t: 50,
+                pad: 4
+            }
+        };
+        
+        Plotly.newPlot('topic-heatmap-chart', [trace], layout);
+    }
+    
+    // Render patterns
+    function renderPatterns(data) {
+        const patternsContainer = document.getElementById('patterns-container');
+        
+        // Clear container
+        patternsContainer.innerHTML = '';
+        
+        // Get filter states
+        const showTopics = document.getElementById('show-topics').checked;
+        const showClusters = document.getElementById('show-clusters').checked;
+        const showEntities = document.getElementById('show-entities').checked;
+        
+        // Get search term
+        const searchTerm = document.getElementById('pattern-search').value.toLowerCase();
+        
+        // Get sort option
+        const sortOption = document.getElementById('sort-patterns').value;
+        
+        // Prepare patterns to render
+        let patterns = [];
+        
+        // Add topics
+        if (showTopics) {
+            data.topics.forEach(topic => {
+                // Count chunks associated with this topic
+                const associatedChunks = data.chunk_pattern_relations.filter(rel => 
+                    rel.pattern_type === 'topic' && rel.pattern_id === topic.topic_id
+                ).length;
+                
+                patterns.push({
+                    type: 'topic',
+                    id: topic.topic_id,
+                    title: `Topic ${topic.topic_id}`,
+                    content: topic.keywords.join(', '),
+                    weight: topic.weight,
+                    associatedChunks: associatedChunks,
+                    data: topic
+                });
+            });
+        }
+        
+        // Add clusters
+        if (showClusters) {
+            data.clusters.forEach(cluster => {
+                // Count chunks associated with this cluster
+                const associatedChunks = data.chunk_pattern_relations.filter(rel => 
+                    rel.pattern_type === 'cluster' && rel.pattern_id === cluster.cluster_id
+                ).length;
+                
+                patterns.push({
+                    type: 'cluster',
+                    id: cluster.cluster_id,
+                    title: `Cluster ${cluster.cluster_id}`,
+                    content: cluster.sample_sentences.join(' ... '),
+                    weight: cluster.sentence_count / 10, // Normalize weight
+                    associatedChunks: associatedChunks,
+                    data: cluster
+                });
+            });
+        }
+        
+        // Add entities
+        if (showEntities) {
+            // Group entities by type and text
+            const entityGroups = {};
+            data.entities.forEach(entity => {
+                const key = `${entity.entity_type}:${entity.entity_text}`;
+                if (!entityGroups[key]) {
+                    entityGroups[key] = {
+                        type: 'entity',
+                        id: key,
+                        title: `${entity.entity_text} (${entity.entity_type})`,
+                        content: `Entity found in document(s): ${entity.document_id}`,
+                        weight: entity.frequency / 10, // Normalize weight
+                        associatedChunks: 0, // Will count later
+                        data: {
+                            entity_type: entity.entity_type,
+                            entity_text: entity.entity_text,
+                            frequency: entity.frequency,
+                            documents: [entity.document_id]
+                        }
+                    };
+                } else {
+                    entityGroups[key].data.frequency += entity.frequency;
+                    entityGroups[key].weight = entityGroups[key].data.frequency / 10;
+                    if (!entityGroups[key].data.documents.includes(entity.document_id)) {
+                        entityGroups[key].data.documents.push(entity.document_id);
+                    }
+                    entityGroups[key].content = `Entity found in document(s): ${entityGroups[key].data.documents.join(', ')}`;
+                }
+            });
+            
+            // Add entity groups to patterns
+            Object.values(entityGroups).forEach(entityGroup => {
+                patterns.push(entityGroup);
+            });
+        }
+        
+        // Filter by search term
+        if (searchTerm) {
+            patterns = patterns.filter(pattern => {
+                return (
+                    pattern.title.toLowerCase().includes(searchTerm) ||
+                    pattern.content.toLowerCase().includes(searchTerm)
+                );
+            });
+        }
+        
+        // Sort patterns
+        switch (sortOption) {
+            case 'weight-desc':
+                patterns.sort((a, b) => b.weight - a.weight);
+                break;
+            case 'weight-asc':
+                patterns.sort((a, b) => a.weight - b.weight);
+                break;
+            case 'chunks-desc':
+                patterns.sort((a, b) => b.associatedChunks - a.associatedChunks);
+                break;
+            case 'chunks-asc':
+                patterns.sort((a, b) => a.associatedChunks - b.associatedChunks);
+                break;
+            default:
+                // Default sorting: topics first, then clusters, then entities
+                patterns.sort((a, b) => {
+                    const typeOrder = { 'topic': 0, 'cluster': 1, 'entity': 2 };
+                    if (typeOrder[a.type] !== typeOrder[b.type]) {
+                        return typeOrder[a.type] - typeOrder[b.type];
+                    }
+                    return a.id - b.id;
+                });
+        }
+        
+        // Show message if no patterns match filters
+        if (patterns.length === 0) {
+            patternsContainer.innerHTML = `
+                <div class="col-12 text-center py-5">
+                    <p class="text-muted">No patterns match the current filters.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Render each pattern
+        patterns.forEach(pattern => {
+            const patternCard = document.createElement('div');
+            patternCard.className = 'col-md-6 col-lg-4 mb-4';
+            
+            let badgeClass = '';
+            let cardClass = '';
+            
+            switch (pattern.type) {
+                case 'topic':
+                    badgeClass = 'topic-badge';
+                    cardClass = 'topic-card';
+                    break;
+                case 'cluster':
+                    badgeClass = 'cluster-badge';
+                    cardClass = 'cluster-card';
+                    break;
+                case 'entity':
+                    badgeClass = 'entity-badge';
+                    cardClass = 'entity-card';
+                    break;
+            }
+            
+            // Truncate content if too long
+            const displayContent = pattern.content.length > 150 
+                ? pattern.content.substring(0, 150) + '...' 
+                : pattern.content;
+            
+            patternCard.innerHTML = `
+                <div class="card h-100 pattern-card ${cardClass}" data-pattern-type="${pattern.type}" data-pattern-id="${pattern.id}">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">${pattern.title}</h6>
+                        <span class="badge ${badgeClass}">${pattern.type}</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="small">${displayContent}</p>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                <span class="badge bg-secondary">Weight: ${pattern.weight.toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-info">Chunks: ${pattern.associatedChunks}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <button class="btn btn-sm btn-primary view-pattern-btn" 
+                                data-pattern-type="${pattern.type}" 
+                                data-pattern-id="${pattern.id}">
+                            <i class="fas fa-search me-1"></i> View Details
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            patternsContainer.appendChild(patternCard);
+        });
+        
+        // Add event listeners to pattern cards
+        document.querySelectorAll('.view-pattern-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const patternType = this.getAttribute('data-pattern-type');
+                const patternId = this.getAttribute('data-pattern-id');
+                showPatternDetails(patternType, patternId);
+            });
+        });
+    }
+    
+    // Show pattern details in modal
+    function showPatternDetails(patternType, patternId) {
+        if (!visualizationData) return;
+        
+        let pattern = null;
+        let associatedChunks = [];
+        
+        // Find the pattern
+        switch (patternType) {
+            case 'topic':
+                pattern = visualizationData.topics.find(t => t.topic_id === parseInt(patternId));
+                if (pattern) {
+                    // Find chunks associated with this topic
+                    const chunkIds = visualizationData.chunk_pattern_relations
+                        .filter(rel => rel.pattern_type === 'topic' && rel.pattern_id === pattern.topic_id)
+                        .map(rel => rel.chunk_id);
+                    
+                    associatedChunks = visualizationData.chunks.filter(chunk => chunkIds.includes(chunk.chunk_id));
+                }
+                break;
+                
+            case 'cluster':
+                pattern = visualizationData.clusters.find(c => c.cluster_id === parseInt(patternId));
+                if (pattern) {
+                    // Find chunks associated with this cluster
+                    const chunkIds = visualizationData.chunk_pattern_relations
+                        .filter(rel => rel.pattern_type === 'cluster' && rel.pattern_id === pattern.cluster_id)
+                        .map(rel => rel.chunk_id);
+                    
+                    associatedChunks = visualizationData.chunks.filter(chunk => chunkIds.includes(chunk.chunk_id));
+                }
+                break;
+                
+            case 'entity':
+                // For entities, patternId is in format "ENTITY_TYPE:ENTITY_TEXT"
+                const [entityType, entityText] = patternId.split(':');
+                
+                // Find all entities matching this type and text
+                const matchingEntities = visualizationData.entities.filter(e => 
+                    e.entity_type === entityType && e.entity_text === entityText
+                );
+                
+                if (matchingEntities.length > 0) {
+                    // Combine entity data
+                    pattern = {
+                        entity_type: entityType,
+                        entity_text: entityText,
+                        frequency: matchingEntities.reduce((sum, e) => sum + e.frequency, 0),
+                        documents: [...new Set(matchingEntities.map(e => e.document_id))]
+                    };
+                    
+                    // Find chunks containing this entity
+                    associatedChunks = visualizationData.chunks.filter(chunk => 
+                        (chunk.entities || []).includes(entityText)
+                    );
+                }
+                break;
+        }
+        
+        if (!pattern) return;
+        
+        // Set modal title
+        let modalTitle = '';
+        switch (patternType) {
+            case 'topic':
+                modalTitle = `Topic ${pattern.topic_id}`;
+                break;
+            case 'cluster':
+                modalTitle = `Cluster ${pattern.cluster_id}`;
+                break;
+            case 'entity':
+                modalTitle = `Entity: ${pattern.entity_text} (${pattern.entity_type})`;
+                break;
+        }
+        document.getElementById('modal-pattern-title').textContent = modalTitle;
+        
+        // Set pattern content
+        const patternContentContainer = document.getElementById('modal-pattern-content');
+        patternContentContainer.innerHTML = '';
+        
+        switch (patternType) {
+            case 'topic':
+                patternContentContainer.innerHTML = `
+                    <h6>Top Keywords:</h6>
+                    <div class="mb-3">
+                        ${pattern.keywords.map(keyword => `<span class="badge bg-secondary me-1 mb-1">${keyword}</span>`).join('')}
+                    </div>
+                    <h6>Topic Weight: ${pattern.weight.toFixed(2)}</h6>
+                `;
+                break;
+                
+            case 'cluster':
+                patternContentContainer.innerHTML = `
+                    <h6>Sample Sentences:</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        ${pattern.sample_sentences.map(sentence => `<li class="list-group-item small">${sentence}</li>`).join('')}
+                    </ul>
+                    <h6>Total Sentences in Cluster: ${pattern.sentence_count}</h6>
+                `;
+                break;
+                
+            case 'entity':
+                patternContentContainer.innerHTML = `
+                    <h6>Entity Type: ${pattern.entity_type}</h6>
+                    <h6>Entity Text: ${pattern.entity_text}</h6>
+                    <h6>Frequency: ${pattern.frequency}</h6>
+                    <h6>Found in Documents:</h6>
+                    <ul class="list-group list-group-flush mb-3">
+                        ${pattern.documents.map(docId => `<li class="list-group-item small">${docId}</li>`).join('')}
+                    </ul>
+                `;
+                break;
+        }
+        
+        // Set pattern statistics
+        const patternStatsContainer = document.getElementById('modal-pattern-stats');
+        patternStatsContainer.innerHTML = `
+            <div class="row">
+                <div class="col-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-body text-center">
+                            <h3>${associatedChunks.length}</h3>
+                            <p class="mb-0">Associated Chunks</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card bg-light mb-3">
+                        <div class="card-body text-center">
+                            <h3>${[...new Set(associatedChunks.map(chunk => chunk.document_id))].length}</h3>
+                            <p class="mb-0">Documents</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Set associated chunks
+        const associatedChunksContainer = document.getElementById('modal-associated-chunks');
+        associatedChunksContainer.innerHTML = '';
+        
+        if (associatedChunks.length === 0) {
+            associatedChunksContainer.innerHTML = '<p class="text-muted">No chunks associated with this pattern.</p>';
+        } else {
+            associatedChunks.forEach(chunk => {
+                const chunkElement = document.createElement('div');
+                chunkElement.className = 'card mb-3';
+                chunkElement.innerHTML = `
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Chunk ${chunk.chunk_id} (Document: ${chunk.document_id})</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="small">${chunk.content_preview}</p>
+                    </div>
+                `;
+                associatedChunksContainer.appendChild(chunkElement);
+            });
+        }
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('pattern-detail-modal'));
+        modal.show();
+    }
+    
+    // Filter and search event listeners
+    document.getElementById('show-topics').addEventListener('change', function() {
+        if (visualizationData) renderPatterns(visualizationData);
+    });
+    
+    document.getElementById('show-clusters').addEventListener('change', function() {
+        if (visualizationData) renderPatterns(visualizationData);
+    });
+    
+    document.getElementById('show-entities').addEventListener('change', function() {
+        if (visualizationData) renderPatterns(visualizationData);
+    });
+    
+    document.getElementById('pattern-search-btn').addEventListener('click', function() {
+        if (visualizationData) renderPatterns(visualizationData);
+    });
+    
+    document.getElementById('pattern-search').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && visualizationData) {
+            renderPatterns(visualizationData);
+        }
+    });
+    
+    document.getElementById('sort-patterns').addEventListener('change', function() {
+        if (visualizationData) renderPatterns(visualizationData);
+    });
+    
+    // Initial data fetch
+    fetchVisualizationData();
+});
+</script>
+{% endblock %}

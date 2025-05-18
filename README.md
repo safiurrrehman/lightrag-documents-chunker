@@ -11,6 +11,10 @@ A pattern-aware RAG system that intelligently processes documents using NLP tech
   - Key entity extraction
 - Intelligent chunking with configurable parameters
 - Batch upserting to LightRAG deployment
+- Interactive visualization interface:
+  - Chunk visualization with size distribution and relationship graphs
+  - Pattern explorer for topics, clusters, and entities
+  - Interactive network graph showing relationships between documents, chunks, and patterns
 
 ## Setup
 
@@ -21,12 +25,12 @@ A pattern-aware RAG system that intelligently processes documents using NLP tech
 
 ## Usage
 
-# Start the LightRAG Server
+### Start the LightRAG Server
 ```bash
 python mock_lightrag_server.py
 ```
 
-# Run the Pipeline
+### Run the Pipeline
 ```bash
 python main.py --documents_directory /path/to/documents --lightrag_url http://localhost:8000
 ```
@@ -35,3 +39,15 @@ For more options, run:
 ```bash
 python main.py --help
 ```
+
+### Launch the Visualization Interface
+```bash
+python run_visualization.py
+```
+
+This will start the visualization server on http://localhost:5001 and automatically open it in your browser. The visualization interface allows you to:
+
+- Process documents directly from the web interface
+- Visualize chunk distribution and relationships
+- Explore patterns identified across documents
+- Generate interactive network graphs showing relationships between documents, chunks, and patterns

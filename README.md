@@ -21,8 +21,14 @@ A pattern-aware RAG system that intelligently processes documents using NLP tech
 
 ## Usage
 
+# Start the LightRAG Server
 ```bash
-python main.py --documents_directory /path/to/documents --lightrag_url https://your-lightrag-deployment-url
+python mock_lightrag_server.py
+```
+
+# Run the Pipeline
+```bash
+python main.py --documents_directory /path/to/documents --lightrag_url http://localhost:8000
 ```
 
 For more options, run:

@@ -8,12 +8,25 @@ identified by the RAG system chunking pipeline.
 import os
 import json
 import logging
+import time
+import numpy as np
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import networkx as nx
 from pyvis.network import Network
 import plotly.graph_objects as go
 import sys
+
+# Custom JSON encoder to handle NumPy types
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
 
 # Add parent directory to path to import modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Configure Flask to use our custom JSON encoder
+app.json_encoder = NumpyEncoder
 
 # Directory to store visualization data
 VISUALIZATION_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -102,7 +118,7 @@ def process_documents():
         timestamp = int(time.time())
         visualization_data_path = os.path.join(VISUALIZATION_DATA_DIR, f"visualization_data_{timestamp}.json")
         with open(visualization_data_path, 'w') as f:
-            json.dump(visualization_data, f, indent=2)
+            json.dump(visualization_data, f, cls=NumpyEncoder, indent=2)
         
         return jsonify({
             "status": "success",
@@ -162,45 +178,97 @@ def generate_visualization_data(documents, patterns, chunks):
     # Extract cluster data
     cluster_data = []
     if 'cluster_patterns' in patterns and 'clusters' in patterns['cluster_patterns']:
-        for cluster_idx, sentences in enumerate(patterns['cluster_patterns']['clusters']):
-            cluster_data.append({
-                "cluster_id": cluster_idx,
-                "sentence_count": len(sentences),
-                "sample_sentences": sentences[:3]  # Sample sentences from cluster
-            })
+        clusters = patterns['cluster_patterns']['clusters']
+        # Handle different cluster formats
+        if isinstance(clusters, list):
+            for cluster_idx, sentences in enumerate(clusters):
+                # Check if sentences is a list or another type
+                if isinstance(sentences, list):
+                    sample_sentences = sentences[:3] if len(sentences) > 0 else []
+                    sentence_count = len(sentences)
+                else:
+                    # Handle case where sentences might be a count or other value
+                    sample_sentences = []
+                    sentence_count = 1 if sentences else 0
+                    
+                cluster_data.append({
+                    "cluster_id": cluster_idx,
+                    "sentence_count": sentence_count,
+                    "sample_sentences": sample_sentences
+                })
+        elif isinstance(clusters, dict):
+            # Alternative format where clusters might be a dictionary
+            for cluster_id, cluster_info in clusters.items():
+                if isinstance(cluster_info, dict) and 'sentences' in cluster_info:
+                    sentences = cluster_info['sentences']
+                    sample_sentences = sentences[:3] if isinstance(sentences, list) and len(sentences) > 0 else []
+                    sentence_count = len(sentences) if isinstance(sentences, list) else 1
+                else:
+                    sample_sentences = []
+                    sentence_count = 1
+                    
+                cluster_data.append({
+                    "cluster_id": cluster_id,
+                    "sentence_count": sentence_count,
+                    "sample_sentences": sample_sentences
+                })
     
     # Extract entity data
     entity_data = []
     if 'entity_patterns' in patterns:
         for doc_id, entities in patterns['entity_patterns'].items():
-            for entity_type, entity_list in entities.items():
-                for entity in entity_list:
+            # Handle different entity pattern formats
+            if isinstance(entities, dict):
+                # Original format: entities is a dict with entity_type as keys
+                for entity_type, entity_list in entities.items():
+                    for entity in entity_list:
+                        entity_data.append({
+                            "document_id": doc_id,
+                            "entity_type": entity_type,
+                            "entity_text": entity['text'],
+                            "frequency": entity.get('count', 1)
+                        })
+            elif isinstance(entities, list):
+                # Alternative format: entities is a list of entity objects
+                for entity in entities:
                     entity_data.append({
                         "document_id": doc_id,
-                        "entity_type": entity_type,
-                        "entity_text": entity['text'],
-                        "frequency": entity['count']
+                        "entity_type": entity.get('label', 'ENTITY'),
+                        "entity_text": entity.get('text', ''),
+                        "frequency": entity.get('count', 1)
                     })
     
     # Extract chunk data
     chunk_data = []
     for chunk_idx, chunk in enumerate(chunks):
-        chunk_data.append({
+        # Create a chunk data object with safe access to fields
+        chunk_obj = {
             "chunk_id": chunk_idx,
-            "document_id": chunk['document_id'],
-            "start_position": chunk['start_position'],
-            "end_position": chunk['end_position'],
-            "content_preview": chunk['content'][:100] + "..." if len(chunk['content']) > 100 else chunk['content'],
-            "topics": chunk.get('topics', []),
-            "entities": chunk.get('entities', []),
-            "clusters": chunk.get('clusters', [])
-        })
+            "document_id": chunk.get('document_id', f'doc{chunk_idx}'),
+            "content_preview": chunk.get('content', '')[:100] + "..." if len(chunk.get('content', '')) > 100 else chunk.get('content', '')
+        }
+        
+        # Add position information if available
+        if 'start_position' in chunk and 'end_position' in chunk:
+            chunk_obj["start_position"] = chunk['start_position']
+            chunk_obj["end_position"] = chunk['end_position']
+        else:
+            # Estimate positions if not available
+            chunk_obj["start_position"] = 0
+            chunk_obj["end_position"] = len(chunk.get('content', ''))
+        
+        # Add pattern information
+        chunk_obj["topics"] = chunk.get('topics', [])
+        chunk_obj["entities"] = chunk.get('entities', [])
+        chunk_obj["clusters"] = chunk.get('clusters', [])
+            
+        chunk_data.append(chunk_obj)
     
     # Create document-chunk relationships
     document_chunk_relations = []
     for chunk_idx, chunk in enumerate(chunks):
         document_chunk_relations.append({
-            "document_id": chunk['document_id'],
+            "document_id": chunk.get('document_id', f'doc{chunk_idx}'),
             "chunk_id": chunk_idx
         })
     
